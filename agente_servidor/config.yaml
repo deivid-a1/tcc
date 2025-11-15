@@ -1,0 +1,10 @@
+mcp_servers:
+  - name: horarios_unb
+    url: http://127.0.0.1:8888/mcp
+
+llm:
+  provider: qwen_local
+  model: Qwen/Qwen2.5-7B-Instruct
+
+agent:
+  max_iterations: 4

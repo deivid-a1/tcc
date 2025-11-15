@@ -4,7 +4,7 @@ Exemplo de uso do sistema LLM orientado a objetos
 
 from log.log_manager import LogManager
 from llm.qwen_llm import QwenLLM
-from agent import LLMAgent
+from agent import Agent
 
 
 def main():
@@ -23,7 +23,7 @@ def main():
     qwen_model.load_model()
     
     # Cria um agente
-    agent = LLMAgent(
+    agent = Agent(
         llm_model=qwen_model,
         agent_name="AssistenteTecnico",
         log_manager=log_manager

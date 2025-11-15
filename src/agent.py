@@ -6,7 +6,7 @@ from llm.base_llm import BaseLLM
 from log.log_manager import LogManager
 
 
-class LLMAgent:
+class Agent:
     """Agente que interage com modelos LLM para tarefas específicas"""
     
     def __init__(
@@ -71,7 +71,7 @@ class LLMAgent:
     
     def _build_prompt_with_history(self, current_message: str) -> str:
         """Constrói prompt incluindo histórico da conversação"""
-        prompt_parts = ["Histórico da conversação:"]
+        prompt_parts = ["Conversation history:"]
         
         # Inclui últimas N mensagens para não exceder limite de contexto
         recent_history = self.conversation_history[-5:]  # Últimas 5 mensagens
