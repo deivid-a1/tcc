@@ -12,14 +12,7 @@ async def initialize_system(config_path: str = "config.yaml"):
     with open(config_path) as f:
         config = yaml.safe_load(f)
     
-    print("🚀 Inicializando sistema do Agente REACT UnB...\n")
-    
-    print("📦 Criando registry de ferramentas...")
     tool_registry = ToolRegistry()
-    
-    print("🔧 Registrando ferramentas internas...")
-    tool_registry.register(CalculadoraTool())
-    print("  ✓ Calculadora registrada")
     
     print("\n🌐 Configurando conexões MCP...")
     mcp_manager = MCPClientManager()

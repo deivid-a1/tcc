@@ -46,7 +46,6 @@ def main():
         return
 
     try:
-        print("🚀 Servidor MCP do Agente rodando em http://127.0.0.1:8889")
         mcp.run(
             transport='http',
             host="0.0.0.0",

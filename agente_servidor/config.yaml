@@ -1,6 +1,6 @@
 mcp_servers:
-  - name: horarios_unb
-    url: http://127.0.0.1:8888/mcp
+  - name: rag_unb
+    url: http://0.0.0.0:8888/mcp
 
 llm:
   provider: qwen_local

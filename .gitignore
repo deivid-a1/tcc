@@ -2,6 +2,7 @@
 
 meus_logs/
 log/
+.venv
 
 
 # Python

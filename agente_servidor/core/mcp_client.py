@@ -34,15 +34,10 @@ class MCPClientManager:
                 tools_response = await client.list_tools()
                 
                 for tool_info in tools_response:
-                    try:
-                        params = json.loads(tool_info.input_schema)
-                    except Exception:
-                        params = {}
-
                     mcp_tool = MCPTool(
                         name=tool_info.name,
                         description=tool_info.description or "Sem descrição",
-                        parameters=params,
+                        parameters=tool_info.inputSchema,
                         mcp_client=client,
                         mcp_tool_name=tool_info.name
                     )

@@ -1,0 +1,11 @@
+google-genai
+psycopg2-binary
+pgvector
+sentence-transformers
+python-dotenv
+requests
+beautifulsoup4
+PyMuPDF
+playwright
+langchain-text-splitters
+lxml

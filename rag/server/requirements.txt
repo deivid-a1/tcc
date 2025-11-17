@@ -1,0 +1,7 @@
+fastmcp[cli]
+psycopg2-binary
+pgvector
+sentence-transformers
+python-dotenv
+pydantic
+uvicorn

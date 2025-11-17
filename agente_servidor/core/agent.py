@@ -24,6 +24,7 @@ class ReactAgent:
     
     def _build_system_prompt(self) -> str:
         tools_description = self.tools.get_tools_description()
+        logger.info(tools_description)
         
         return f"""Você é um agente assistente de estudantes da Universidade de Brasília (UnB).
 
