@@ -29,7 +29,7 @@ class TextProcessor:
         if not text or len(text) < 50: return ""
         try:
             response = self.genai_client.models.generate_content(
-                model='gemini-1.5-flash',
+                model='gemini-2.5-flash',
                 contents=f"Gere 5 a 10 palavras-chave para busca técnica: {text[:2000]}"
             )
             return response.text.strip() if response.text else ""
