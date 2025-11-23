@@ -1,0 +1,21 @@
+# --- Core & Banco de Dados ---
+python-dotenv          # Carregar .env
+psycopg2-binary        # Driver PostgreSQL
+pgvector               # Suporte a vetores no Postgres
+pydantic               # Validação de dados
+
+# --- IA & Embeddings ---
+sentence-transformers  # Geração de embeddings locais (Hugging Face)
+google-genai           # SDK novo do Gemini (para enriquecimento)
+langchain-text-splitters # Divisão inteligente de textos
+
+# --- Ingestão & Crawler ---
+requests               # Requisições HTTP simples
+beautifulsoup4         # Parsing de HTML
+lxml                   # Processador rápido para o BeautifulSoup
+playwright             # Crawler para páginas dinâmicas (JS)
+PyMuPDF                # Leitura de PDFs (import fitz)
+
+# --- Servidor (API) ---
+fastmcp[cli]           # Protocolo MCP
+uvicorn                # Servidor web ASSGI

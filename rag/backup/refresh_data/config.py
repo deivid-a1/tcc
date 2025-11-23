@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
 DB_SETTINGS = {
     "user": os.environ.get("DB_USER", "postgres"),
     "password": os.environ.get("DB_PASS", "postgres"),
@@ -14,9 +16,12 @@ DB_SETTINGS = {
 HF_MODEL_NAME = "paraphrase-multilingual-mpnet-base-v2"
 VECTOR_DIMENSION = 768
 
-DB_TABLE = "documentos_unb"
-TEXT_COLUMN = "conteudo"
-SOURCE_COLUMN = "fonte"
-VECTOR_COLUMN = "embedding"
+CHUNK_SIZE = 1000
+CHUNK_OVERLAP = 200
+LOCAL_DOCS_PATH = "documentos_locais/2026_01/"
 
-TOP_K_RESULTS = 5
+SEED_URLS = [
+    "https://boasvindas.unb.br/registro-academico",
+    "https://boasvindas.unb.br/matricula",
+    "https://boasvindas.unb.br/checklist"
+]

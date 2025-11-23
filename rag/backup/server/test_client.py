@@ -3,10 +3,10 @@ import asyncio
 import sys
 import textwrap
 import os
+import json
 from logging.handlers import RotatingFileHandler
 
 from fastmcp import Client
-from fastmcp.exceptions import ToolError 
 
 LOG_DIR = "logs"
 if not os.path.exists(LOG_DIR):
@@ -39,10 +39,10 @@ SERVER_URL = "http://127.0.0.1:8888/mcp"
 TOOL_NAME = "enriquecer_prompt_com_rag_unb"
 
 TEST_PROMPTS = [
-    "Quais são as últimas notícias da Universidade de Brasília?",
-    "Quais são os editais mais recentes de 2025?",
-    "O que o DPG falou sobre bolsas de estudo 2025?",
-    "Qual o procedimento descrito no 'manual_aluno.pdf'?",
+    "Quais os documentos necessários para a matrícula de calouros?",
+    "Como funciona o aproveitamento de estudos na UnB?",
+    "Onde e como faço a carteirinha estudantil?",
+    "Explique o sistema de registro acadêmico",
     "Qual é a capital da França?"
 ]
 
@@ -65,24 +65,30 @@ async def run_tests():
                     tool_args = {"prompt_usuario": prompt}
                     result = await client.call_tool(TOOL_NAME, tool_args)
 
-                    rag_output = result.data
-                    
+                    try:
+                        content_text = result.content[0].text
+                        rag_output = json.loads(content_text)
+                    except (AttributeError, json.JSONDecodeError, IndexError):
+                        logger.warning(f"Resposta bruta não é JSON válido ou estrutura inesperada: {result}")
+                        continue
+
                     logger.info(f"✅ RESPOSTA DO SERVIDOR (RAGOutput):")
                     
-                    if rag_output.contexto_recuperado:
-                        logger.info(f"Encontrados {len(rag_output.contexto_recuperado)} chunks de contexto:")
+                    contextos = rag_output.get("contexto_recuperado", [])
+                    fontes = rag_output.get("fontes", [])
+                    
+                    if contextos:
+                        logger.info(f"Encontrados {len(contextos)} chunks de contexto:")
                         
-                        for j, (contexto, fonte) in enumerate(zip(rag_output.contexto_recuperado, rag_output.fontes)):
+                        for j, (contexto, fonte) in enumerate(zip(contextos, fontes)):
                             logger.info(f"\n  --- Chunk {j+1} (Fonte: {fonte}) ---")
                             wrapped_text = textwrap.fill(f'"{contexto}"', width=78, initial_indent='  ', subsequent_indent='  ')
                             logger.info(wrapped_text)
                     else:
                         logger.warning("⚠️ O servidor não retornou nenhum contexto (RAG 0 resultados).")
 
-                except ToolError as e:
-                    logger.error(f"\n[ERRO DA FERRAMENTA] O servidor retornou um erro: {e}")
                 except Exception as e:
-                    logger.error(f"\n[ERRO INESPERADO] {e}", exc_info=True)
+                    logger.error(f"\n[ERRO DA FERRAMENTA] O servidor retornou um erro: {e}", exc_info=True)
 
     except Exception as e:
         logger.error(f"\n[ERRO FATAL] Não foi possível conectar ao servidor em {SERVER_URL}.")
