@@ -1,10 +1,12 @@
 mcp_servers:
   - name: rag_unb
     url: http://0.0.0.0:8888/mcp
+  - name: ferramentas-complexas-unb
+    url: http://0.0.0.0:8889/mcp
 
 llm:
   provider: qwen_local
   model: Qwen/Qwen2.5-7B-Instruct
 
 agent:
-  max_iterations: 4
+  max_iterations: 20

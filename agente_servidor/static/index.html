@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agente UnB - Interface React</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos para o fluxo de pensamento */
+        .thought-line { border-left: 2px solid #60a5fa; padding-left: 0.5rem; margin-bottom: 0.5rem; }
+        .action-line { color: #f59e0b; font-family: monospace; }
+        .obs-line { color: #10b981; font-size: 0.9em; margin-left: 1rem; }
+        .log-raw { color: #6b7280; font-size: 0.8em; font-family: monospace; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 h-screen flex overflow-hidden">
+
+    <div id="login-overlay" class="absolute inset-0 bg-gray-900 z-50 flex items-center justify-center">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-2xl w-96 border border-gray-700">
+            <h2 class="text-2xl font-bold mb-6 text-center text-blue-400">Acesso Restrito</h2>
+            <input type="password" id="password-input" placeholder="Senha do Administrador" 
+                   class="w-full bg-gray-700 border border-gray-600 rounded p-3 mb-4 text-white focus:outline-none focus:border-blue-500">
+            <button onclick="checkLogin()" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition">
+                Entrar
+            </button>
+            <p id="login-error" class="text-red-500 text-sm mt-3 hidden text-center">Senha incorreta</p>
+        </div>
+    </div>
+
+    <div class="flex w-full max-w-7xl mx-auto h-full p-4 gap-4 blur-sm transition-all duration-500" id="main-content">
+        
+        <div class="w-1/2 flex flex-col bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+            <div class="p-4 border-b border-gray-700 bg-gray-800 rounded-t-lg">
+                <h1 class="font-bold text-xl flex items-center gap-2">
+                    🎓 Agente UnB
+                    <span class="text-xs font-normal px-2 py-1 bg-green-900 text-green-300 rounded-full" id="status-badge">Desconectado</span>
+                </h1>
+            </div>
+            
+            <div id="chat-history" class="flex-1 overflow-y-auto p-4 space-y-4">
+                <div class="bg-gray-700 p-3 rounded-lg max-w-[80%]">
+                    Olá! Sou o assistente da UnB. Como posso ajudar com horários, cardápios ou informações acadêmicas?
+                </div>
+            </div>
+
+            <div class="p-4 bg-gray-800 border-t border-gray-700">
+                <div class="flex gap-2">
+                    <input type="text" id="user-input" placeholder="Digite sua pergunta..." 
+                           class="flex-1 bg-gray-700 border-gray-600 rounded p-3 focus:outline-none focus:border-blue-500"
+                           onkeypress="handleKeyPress(event)">
+                    <button onclick="sendMessage()" id="send-btn" disabled
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-6 rounded font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+                        Enviar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-1/2 flex flex-col bg-black rounded-lg shadow-lg border border-gray-700 font-mono text-sm">
+            <div class="p-3 border-b border-gray-800 bg-gray-900 rounded-t-lg flex justify-between items-center">
+                <span class="text-gray-400">⚡ Fluxo de Pensamento (Ao Vivo)</span>
+                <button onclick="clearThoughts()" class="text-xs text-gray-500 hover:text-white">Limpar</button>
+            </div>
+            <div id="thoughts-log" class="flex-1 overflow-y-auto p-4 space-y-3 text-gray-300">
+                <div class="text-gray-600 italic">Aguardando processamento...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let mcpPostUrl = null;
+        let eventSource = null;
+        let requestId = 1;
+        const pendingRequests = new Map();
+
+        async function connectMCP() {
+            const statusBadge = document.getElementById('status-badge');
+            statusBadge.innerText = 'Conectando...';
+            statusBadge.className = 'text-xs font-normal px-2 py-1 bg-yellow-900 text-yellow-300 rounded-full';
+
+            eventSource = new EventSource('/mcp/sse');
+
+            eventSource.addEventListener('endpoint', async (event) => {
+                let rawUrl = event.data;
+                const urlObj = new URL(rawUrl, window.location.href);
+                if (!urlObj.pathname.endsWith('/')) {
+                    urlObj.pathname += '/';
+                }
+                mcpPostUrl = urlObj.href;
+                
+                try {
+                    await sendJsonRpc('initialize', { 
+                        protocolVersion: '2024-11-05', 
+                        capabilities: {}, 
+                        clientInfo: { name: 'web-client', version: '1.0' } 
+                    });
+                    
+                    await sendNotification('notifications/initialized', {});
+                    
+                    statusBadge.innerText = 'Online';
+                    statusBadge.className = 'text-xs font-normal px-2 py-1 bg-green-900 text-green-300 rounded-full';
+                    document.getElementById('send-btn').disabled = false;
+                } catch (e) {
+                    console.error('Falha no handshake:', e);
+                    statusBadge.innerText = 'Erro Handshake';
+                }
+            });
+
+            eventSource.addEventListener('message', (event) => {
+                let data;
+                try {
+                    data = JSON.parse(event.data);
+                } catch (e) { return; }
+                
+                // 1. Tratamento de respostas RPC (ID matches)
+                if (data.id && pendingRequests.has(data.id)) {
+                    const { resolve, reject } = pendingRequests.get(data.id);
+                    pendingRequests.delete(data.id);
+                    if (data.error) reject(data.error);
+                    else resolve(data.result);
+                    return;
+                }
+
+                // 2. Tratamento de Notificações / Logs (Pensamentos)
+                if (data.method === 'notifications/message' && data.params) {
+                    // O conteúdo pode vir em 'data' ou 'message'
+                    let content = data.params.data || data.params.message;
+                    
+                    if (content) {
+                        try {
+                            // CORREÇÃO PRINCIPAL: Desembrulhar JSONs aninhados
+                            
+                            // Passo 1: Se for string, tenta virar objeto
+                            if (typeof content === 'string') {
+                                try { content = JSON.parse(content); } catch(e) {}
+                            }
+
+                            // Passo 2: O logger do FastMCP às vezes embrulha em {msg: "...", extra: ...}
+                            // Se content for um objeto e tiver a propriedade 'msg' que é uma string JSON...
+                            if (content && content.msg && typeof content.msg === 'string') {
+                                try {
+                                    const inner = JSON.parse(content.msg);
+                                    // Verifica se o inner parece ser nosso log (tem 'type')
+                                    if (inner.type) {
+                                        content = inner; 
+                                    }
+                                } catch(e) {
+                                    // Se falhar, usa o content original
+                                }
+                            }
+
+                            // Passo 3: Renderiza
+                            if (content && content.type) {
+                                renderThought(content);
+                            } else {
+                                // Fallback para logs genéricos do sistema
+                                const textToShow = typeof content === 'object' ? JSON.stringify(content) : content;
+                                renderRawLog(textToShow, data.params.level);
+                            }
+
+                        } catch (e) {
+                            renderRawLog(String(content), data.params.level);
+                        }
+                    }
+                }
+            });
+
+            eventSource.onerror = () => {
+                statusBadge.innerText = 'Erro Conexão';
+                statusBadge.className = 'text-xs font-normal px-2 py-1 bg-red-900 text-red-300 rounded-full';
+            };
+        }
+
+        function sendJsonRpc(method, params) {
+            return new Promise(async (resolve, reject) => {
+                const id = requestId++;
+                pendingRequests.set(id, { resolve, reject });
+                const payload = { jsonrpc: "2.0", method, params, id };
+
+                try {
+                    const response = await fetch(mcpPostUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        pendingRequests.delete(id);
+                        reject(new Error(`HTTP Error: ${response.status}`));
+                    }
+                } catch (e) {
+                    pendingRequests.delete(id);
+                    reject(e);
+                }
+            });
+        }
+
+        async function sendNotification(method, params) {
+            const payload = { jsonrpc: "2.0", method, params };
+            await fetch(mcpPostUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const btn = document.getElementById('send-btn');
+            const text = input.value.trim();
+            if (!text) return;
+
+            appendMessage('user', text);
+            input.value = '';
+            btn.disabled = true;
+            document.getElementById('thoughts-log').innerHTML = ''; 
+            
+            try {
+                const result = await sendJsonRpc('tools/call', {
+                    name: 'interagir_com_agente',
+                    arguments: { prompt: text }
+                });
+
+                if (result.content && result.content[0]) {
+                    appendMessage('agent', result.content[0].text);
+                } else {
+                    appendMessage('agent', "Sem resposta textual.");
+                }
+            } catch (e) {
+                appendMessage('agent', 'Erro: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                input.focus();
+            }
+        }
+
+        // --- Renderização ---
+        function appendMessage(role, text) {
+            const history = document.getElementById('chat-history');
+            const div = document.createElement('div');
+            const isUser = role === 'user';
+            div.className = `p-3 rounded-lg max-w-[80%] fade-in ${
+                isUser ? 'bg-blue-900 ml-auto text-right' : 'bg-gray-700 mr-auto'
+            }`;
+            div.innerText = text;
+            history.appendChild(div);
+            history.scrollTop = history.scrollHeight;
+        }
+
+        function renderThought(data) {
+            const logs = document.getElementById('thoughts-log');
+            const div = document.createElement('div');
+            div.className = "mb-2 fade-in";
+
+            if (data.type === 'thought') {
+                div.innerHTML = `<div class="thought-line text-blue-300">🤔 ${data.content}</div>`;
+            } else if (data.type === 'tool_start') {
+                div.innerHTML = `<div class="action-line">🛠️ Executando: ${data.tool}</div>
+                                 <div class="text-xs text-gray-500 truncate pl-4">${JSON.stringify(data.input)}</div>`;
+            } else if (data.type === 'observation') {
+                div.innerHTML = `<div class="obs-line">👁️ Retorno: ${data.content.substring(0, 150)}${data.content.length > 150 ? '...' : ''}</div>`;
+            } else if (data.type === 'error') {
+                div.innerHTML = `<div class="text-red-400">❌ Erro: ${data.content}</div>`;
+            } else if (data.type === 'final') {
+                // Opcional: mostrar também no log que acabou
+                div.innerHTML = `<div class="text-green-400 text-xs">✅ Resposta Final Gerada</div>`;
+            } else {
+                div.innerHTML = `<div class="log-raw">${JSON.stringify(data)}</div>`;
+            }
+
+            logs.appendChild(div);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function renderRawLog(msg, level) {
+            const logs = document.getElementById('thoughts-log');
+            const div = document.createElement('div');
+            div.className = "mb-1 fade-in log-raw";
+            div.innerText = `[${level || 'INFO'}] ${msg}`;
+            logs.appendChild(div);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
+        function clearThoughts() { document.getElementById('thoughts-log').innerHTML = '<div class="text-gray-600 italic">Limpo.</div>'; }
+        
+        function checkLogin() {
+            const pwd = document.getElementById('password-input').value;
+            if (pwd === 'admin') {
+                document.getElementById('login-overlay').classList.add('hidden');
+                document.getElementById('main-content').classList.remove('blur-sm');
+                connectMCP();
+            } else {
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>

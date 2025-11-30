@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Dict, Any, List
+from typing import Literal, Optional, Dict, Any, List, Callable
 from pydantic import BaseModel
 import json
 import logging
@@ -24,7 +24,6 @@ class ReactAgent:
     
     def _build_system_prompt(self) -> str:
         tools_description = self.tools.get_tools_description()
-        logger.info(tools_description)
         
         return f"""Você é um agente assistente de estudantes da Universidade de Brasília (UnB).
 
@@ -79,13 +78,12 @@ Sua Resposta JSON:
 IMPORTANTE: Responda APENAS com o JSON, sem texto adicional antes ou depois.
 """
     
-    async def run(self, user_prompt: str) -> str:
+    async def run(self, user_prompt: str, step_callback: Optional[Callable[[Dict], Any]] = None) -> str:
         logger.info(f"Iniciando novo ciclo REACT para o prompt: '{user_prompt[:70]}...'")
         conversation_history = []
         observations = []
         
         for iteration in range(self.MAX_ITERATIONS):
-            logger.info(f"--- Iteração {iteration + 1} ---")
             context = self._build_context(user_prompt, observations)
             
             llm_response = await self.llm.generate(
@@ -94,34 +92,50 @@ IMPORTANTE: Responda APENAS com o JSON, sem texto adicional antes ou depois.
                 conversation_history=conversation_history
             )
             
-            logger.info(f"[LLM Response] Resposta bruta: {llm_response}")
-            
             try:
                 decision = self._parse_decision(llm_response)
             except Exception as e:
-                logger.error(f"[Agent Error] Erro ao parsear JSON: {e}")
-                return f"Erro ao processar decisão do agente: {str(e)}\nResposta: {llm_response}"
+                error_msg = f"Erro ao processar decisão do agente: {str(e)}"
+                if step_callback:
+                    await step_callback({"type": "error", "content": error_msg})
+                return error_msg
             
             conversation_history.append({"role": "assistant", "content": llm_response})
             
-            logger.info(f"[Agent Thought] {decision.thought}")
+            if step_callback:
+                await step_callback({
+                    "type": "thought", 
+                    "content": decision.thought,
+                    "action": decision.action,
+                    "input": decision.action_input
+                })
             
             if decision.action == "ANSWER":
-                logger.info(f"[Agent Action] ANSWER: {decision.answer}")
+                if step_callback:
+                    await step_callback({"type": "final", "content": decision.answer})
                 return decision.answer
             
             elif decision.action == "ABORT":
-                logger.info(f"[Agent Action] ABORT")
                 return "Desculpe, não consegui resolver seu problema com as ferramentas disponíveis."
             
             else:
-                logger.info(f"[Agent Action] Ferramenta: {decision.action}")
-                logger.info(f"[Agent Action] Input: {decision.action_input}")
                 try:
+                    if step_callback:
+                        await step_callback({
+                            "type": "tool_start", 
+                            "tool": decision.action,
+                            "input": decision.action_input
+                        })
+                        
                     tool = self.tools.get_tool(decision.action)
                     result = await tool.execute(**(decision.action_input or {}))
                     observation = f"Resultado da ferramenta '{decision.action}': {result}"
-                    logger.info(f"[Tool Observation] {observation}")
+                    
+                    if step_callback:
+                        await step_callback({
+                            "type": "observation", 
+                            "content": str(result)
+                        })
                     
                     observations.append(observation)
                     
@@ -132,14 +146,14 @@ IMPORTANTE: Responda APENAS com o JSON, sem texto adicional antes ou depois.
                     
                 except Exception as e:
                     error_msg = f"Erro ao executar ferramenta '{decision.action}': {str(e)}"
-                    logger.error(f"[Tool Error] {error_msg}")
                     observations.append(error_msg)
                     conversation_history.append({
                         "role": "user",
                         "content": f"OBSERVATION: {error_msg}"
                     })
+                    if step_callback:
+                        await step_callback({"type": "error", "content": error_msg})
         
-        logger.warning(f"ABORT: Limite de {self.MAX_ITERATIONS} iterações atingido.")
         return f"ABORT: Limite de {self.MAX_ITERATIONS} iterações atingido sem resolver o problema."
     
     def _build_context(self, original_prompt: str, observations: List[str]) -> str:
@@ -153,7 +167,6 @@ IMPORTANTE: Responda APENAS com o JSON, sem texto adicional antes ou depois.
     
     def _parse_decision(self, llm_response: str) -> ReactDecision:
         llm_response = llm_response.strip()
-        
         match = re.search(r'\{.*\}', llm_response, re.DOTALL)
         
         if not match:
@@ -164,6 +177,6 @@ IMPORTANTE: Responda APENAS com o JSON, sem texto adicional antes ou depois.
         try:
             data = json.loads(json_str)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Falha ao decodificar JSON: {e}\nResposta: {json_str}")
+            raise ValueError(f"Falha ao decodificar JSON: {e}")
             
         return ReactDecision(**data)

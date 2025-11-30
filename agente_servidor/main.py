@@ -3,7 +3,6 @@ import yaml
 import logging
 import os
 from core.tools import ToolRegistry
-from tools.calculadora import CalculadoraTool
 from core.mcp_client import MCPClientManager
 from core.llm_provider import QwenLocalProvider
 from core.agent import ReactAgent
