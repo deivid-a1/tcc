@@ -9,7 +9,7 @@ O sistema utiliza uma arquitetura de **Busca Híbrida (Hybrid Search)** combinan
 ## 🚀 Funcionalidades Principais
 
   * **Busca Híbrida com RRF:** Utiliza *Reciprocal Rank Fusion* para combinar a precisão de palavras-chave exatas (`tsvector`) com a compreensão de contexto (`vector cosine similarity`).
-  * **Enriquecimento Inteligente (Gemini 1.5):** Antes de indexar, cada fragmento de texto é analisado pelo Google Gemini para gerar metadados e palavras-chave contextuais, melhorando a recuperabilidade.
+  * **Enriquecimento Inteligente (Gemini 2.5):** Antes de indexar, cada fragmento de texto é analisado pelo Google Gemini para gerar metadados e palavras-chave contextuais, melhorando a recuperabilidade.
   * **Crawler Focado:** Sistema automatizado que varre URLs semente (ex: páginas de matrícula) e extrai conteúdo recursivamente.
   * **Ingestão de Múltiplos Formatos:** Suporte nativo para **PDFs** locais e páginas **Web** (incluindo renderização dinâmica via Playwright).
   * **Arquitetura MCP:** O servidor expõe ferramentas padronizadas para conexão direta com Agentes de IA (Claude Desktop, IDEs com suporte a MCP, etc).
